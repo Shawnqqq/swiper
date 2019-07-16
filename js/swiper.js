@@ -1,77 +1,117 @@
-const PAGE ={
+const PAGE={
     data:{
-        itemlength:5,  //图片数量
-        itemImgScr:['./img/img-1.jpg','./img/img-2.jpg','./img/img-3.jpg','./img/img-4.jpg','./img/img-5.jpg'],
-        itemImgWidth:[0]  //位移距离
+        index:0,  //当前第几个
+        duration:500,  //滑动时长
+        islock:false,
+        translateX:0,  //偏移量
+        defaultLength: null,  //图片数量
+        itemWidth:null  //图片长度
     },
     init:function(){
-        this.bind()
-        this.render()
+        this.clone();
+        this.bind();
     },
-    bind:function(){
-        let swiperList =document.getElementById('swiper-list');
-        let container =document.getElementById('container');
-        window.onload=this.heightLight
-        this.addEvent(container,'click','swiper-btn-left',this.leftTransform)
-        this.addEvent(container,'click','swiper-btn-right',this.rightTransform)
-        this.addEvent(swiperList,'click','swiper-item',this.swiperToggle)
+    clone:function(){
+        let swiperItem = document.getElementsByClassName("swiper-item");
+        let swiperList = document.getElementById('swiper-list')
+        let swiperFirst = swiperItem[0].cloneNode(true)
+        let swiperLast = swiperItem[swiperItem.length-1].cloneNode(true);
+        let index = PAGE.data.index;
+        let swiperItemWidth = swiperList.offsetWidth
+        PAGE.data.itemWidth = swiperItemWidth;
+        PAGE.data.defaultLength =swiperItem.length
+        PAGE.data.translateX = -(swiperItemWidth+swiperItemWidth*index);
+        swiperList.appendChild(swiperFirst);
+        swiperList.prepend(swiperLast);
+        PAGE.goIndex(index);
     },
-    addEvent:function(parents,active,child,callback){
-        parents.addEventListener(active,function(e){
-            e.target.className.indexOf(child)>= 0 && callback(e)
+    goIndex:function(index){
+        let swiperDuration = PAGE.data.duration;
+        let swiperWidth = PAGE.data.itemWidth;
+        let beginTranslateX = PAGE.data.translateX;
+        let endTranslateX = -(swiperWidth+swiperWidth*index);
+        let swiperList = document.getElementById('swiper-list');
+        let islock = PAGE.data.islock;
+        if(islock){
+            return
+        }
+        PAGE.data.islock =true;
+        PAGE.animateTo(beginTranslateX,endTranslateX,swiperDuration,function(value){
+            swiperList.style.transform = `translateX(${value}px)`;
+        },function(value){
+            let swiperLength= PAGE.data.defaultLength;
+            if(index === -1){
+                index = swiperLength-1;
+                value = -(swiperWidth +swiperWidth *index);
+            }
+            if(index === swiperLength){
+                index = 0;
+                value = -(swiperWidth +swiperWidth*index);
+            }
+            swiperList.style.transform = `translateX(${value}px)`;
+            PAGE.data.index=index;
+            PAGE.data.translateX = value;
+            PAGE.data.islock=false;
+            PAGE.hightLight(index);
         })
     },
-    heightLight:function(){              
-        let swiperItems=document.getElementsByClassName('swiper-item'); 
-        let swiperImg = PAGE.data.itemImgWidth[0] / 1024;
-        for(let i=0;i<swiperItems.length;i++){
-            let swiperItem = swiperItems[i]
-            if(i==swiperImg){
-                swiperItem.className ='swiper-item active'
+    animateTo:function(begin,end,duration,changeCallback,finishCallback){
+        let startTime = Date.now();
+        requestAnimationFrame(function update(){
+            let dateNow = Date.now();
+            let time = dateNow-startTime;
+            let value = PAGE.linear(time,begin,end,duration)  //求当前位移距离
+            typeof changeCallback === 'function' && changeCallback(value)
+            if(startTime+duration>dateNow){
+                requestAnimationFrame(update)
             }else{
-                swiperItem.className ='swiper-item'
+                typeof finishCallback === "function" && finishCallback(end)
             }
+        })
+    },
+    linear:function(time,begin,end,duration){
+        return (end-begin)*time/duration+begin;
+    },
+    bind:function(){
+        let swiperPrev = document.getElementById('swiper-prev');
+        let swiperNext = document.getElementById('swiper-next');
+        swiperPrev.addEventListener('click',this.swiperPrev);
+        swiperNext.addEventListener('click',this.swiperNext);
+        let swiperBtn = document.getElementsByClassName('swiper-btn-switch');
+        for(let i=0;i<swiperBtn.length;i++){
+            swiperBtn[i].setAttribute('data-index',i)
+            swiperBtn[i].addEventListener('click',this.swiperSwitch);
         }
+        window,addEventListener('resize',this.swiperReset)
     },
-    render:function(){
-        let imageSection=document.getElementById('image-section');
-        let imageElement=PAGE.data.itemImgWidth.map(item =>{
-            return `
-            <ul class="swiper-img" id="swiper-img" style='transform:translateX(-${item}px)'>
-            </ul>`
-        }).join('')
-        imageSection.innerHTML=imageElement;
-        let swiperImg =document.getElementById('swiper-img');
-        let itemElement=PAGE.data.itemImgScr.map(item =>{
-            return`
-            <li class="img-item"><img src="${item}"></li>`
-        }).join('')
-        swiperImg.innerHTML=itemElement;
+    swiperPrev:function(){
+        let index = PAGE.data.index;
+        PAGE.goIndex(index-1);
     },
-    leftTransform:function(){
-        PAGE.data.itemImgWidth[0] = PAGE.data.itemImgWidth[0] -= 1024
-        if(PAGE.data.itemImgWidth[0]<0){
-            PAGE.data.itemImgWidth[0]=(PAGE.data.itemlength-1) * 1024 //最后一张图片位移距离
+    swiperNext:function(){
+        let index = PAGE.data.index;
+        PAGE.goIndex(index+1);
+    },
+    swiperSwitch:function(e){
+        let index =e.target.dataset.index;
+        index = Number(index);
+        PAGE.goIndex(index);
+    },
+    hightLight:function(index){
+        let swiperBtn = document.getElementsByClassName('swiper-btn-switch');
+        for(let i=0;i<swiperBtn.length;i++){
+            swiperBtn[i].className='swiper-btn-switch';
         }
-        let itemImgWidth = PAGE.data.itemImgWidth[0] 
-        PAGE.data.itemImgWidth[0] = itemImgWidth;
-        PAGE.heightLight();
-        PAGE.render();
+        swiperBtn[index].className = 'swiper-btn-switch active';
     },
-    rightTransform:function(){
-        PAGE.data.itemImgWidth[0] = PAGE.data.itemImgWidth[0] += 1024
-        let itemImgWidths = PAGE.data.itemImgWidth[0]
-        let imglenth = PAGE.data.itemlength * 1024; //最后一张图片位移距离 
-        let itemImgWidth = itemImgWidths % imglenth;  
-        PAGE.data.itemImgWidth[0] = itemImgWidth
-        PAGE.heightLight();
-        PAGE.render();
-    },
-    swiperToggle:function(e){
-        let item = e.target.dataset.item-1
-        PAGE.data.itemImgWidth[0] = item*1024
-        PAGE.heightLight();
-        PAGE.render();
-    },
+    swiperReset:function(){
+        let swiperList =document.getElementById('swiper-list');
+        let swiperWidth = swiperList.offsetWidth;
+        let index =PAGE.data.index;
+        let translateX = -(swiperWidth +swiperWidth*index);
+        PAGE.data.itemWidth = swiperWidth;
+        PAGE.data.translateX = translateX;
+        swiperList.style.transform= `translateX(${translateX}px)`
+    }
 }
-PAGE.init()
+PAGE.init();
